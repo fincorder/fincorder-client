@@ -79,7 +79,7 @@ export function ReportsPage() {
     finally { setExporting(false) }
   }
 
-  return <AppShell><section className="w-full px-4 pb-28 sm:px-8 lg:px-12">
+  return <AppShell><section className="mx-auto w-full max-w-[1500px] px-4 pb-28 sm:px-8 lg:px-12">
     <header className="flex flex-wrap items-end justify-between gap-4 py-6 sm:py-8"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-500">reports / {tab.name}</p><h1 className="mt-1 text-3xl font-black tracking-[-0.07em] text-slate-950 dark:text-white sm:text-4xl">{tab.label}</h1><p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">{tab.description}</p></div><button type="button" disabled={exporting} onClick={() => void download()} className="inline-flex h-10 items-center gap-2 rounded-xl bg-orange-500 px-4 text-xs font-black text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600 disabled:opacity-60">{exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Export CSV</button></header>
     <nav aria-label="Report views" className="mb-4 flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-slate-800 dark:bg-[#0d1a2c]">{tabs.map((item) => <Link key={item.name} to={`/app/reports/${item.name}`} onClick={() => updateFilters({ offset: 0, sort_by: defaultSort(item.name) })} className={['shrink-0 rounded-xl px-3 py-2 text-[11px] font-black transition', item.name === tab.name ? 'bg-orange-500 text-white shadow-sm' : 'text-slate-500 hover:bg-orange-50 hover:text-orange-500 dark:text-slate-400 dark:hover:bg-slate-800'].join(' ')}>{item.label}</Link>)}</nav>
     <ReportFiltersBar filters={filters} onChange={updateFilters} options={options} timezone={user?.timezone} />
