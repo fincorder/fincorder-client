@@ -3,6 +3,8 @@ export interface AuthUser {
   name: string
   status: string
   email?: string
+  review_transactions?: boolean
+  timezone?: string
 }
 
 export interface AuthSession extends AuthUser {

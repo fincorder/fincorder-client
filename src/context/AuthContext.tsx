@@ -12,6 +12,7 @@ interface AuthContextValue {
   signIn: (payload: LoginPayload) => Promise<void>
   signInWithSession: (session: AuthSession, email?: string) => void
   saveProfile: (name: string) => Promise<void>
+  savePreferences: (preferences: { review_transactions?: boolean; timezone?: string }) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -83,7 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const value = { user, isLoading, signIn, signInWithSession: setSession, saveProfile, signOut }
+  async function savePreferences(preferences: { review_transactions?: boolean; timezone?: string }) {
+    const updated = await updateProfile(undefined, preferences)
+    persistUser(updated)
+    setUser(updated)
+  }
+
+  const value = { user, isLoading, signIn, signInWithSession: setSession, saveProfile, savePreferences, signOut }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

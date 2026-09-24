@@ -5,11 +5,13 @@ export type TransactionType = 'expense' | 'income' | 'transfer' | 'lend' | 'borr
 export type TransactionDirection = 'debit' | 'credit'
 
 export interface TransactionProposal {
+  draft_id?: string | null
+  changed_fields?: string[]
   operation: TransactionOperation
   transaction_id: string | null
   type: TransactionType | null
   amount: string | number | null
-  currency: string
+  currency: string | null
   account: string | null
   category: string | null
   person: string | null
@@ -25,6 +27,8 @@ export interface CaptureMessage {
   content: string
   proposal?: TransactionProposal[]
   financialEventId?: string
+  captureStatus?: string
+  revision?: number
 }
 
 export interface CaptureResponse {
@@ -38,6 +42,8 @@ export interface CaptureResponse {
   missing_fields: string[]
   awaiting_confirmation: boolean
   proposed_transactions: TransactionProposal[]
+  revision: number
+  transaction_ids: string[]
 }
 
 export interface ConfirmCaptureResponse {
@@ -45,4 +51,31 @@ export interface ConfirmCaptureResponse {
   status: string
   assistant_message: string
   transaction_ids: string[]
+  revision: number
+}
+
+export type ReviewEventStatus = 'awaiting_confirmation' | 'needs_clarification' | 'failed'
+
+export interface ReviewEvent {
+  id: string
+  conversation_id: string
+  conversation_title: string | null
+  source_message_id: string
+  status: ReviewEventStatus
+  raw_text: string
+  extracted_data: { transactions?: TransactionProposal[] } | null
+  missing_fields: string[] | null
+  error: string | null
+  assistant_message_id: string | null
+  revision: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ReviewEventPage {
+  items: ReviewEvent[]
+  total: number
+  limit: number
+  offset: number
+  has_next: boolean
 }

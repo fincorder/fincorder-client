@@ -108,7 +108,6 @@ export function TransactionsPage() {
 
   useEffect(() => {
     let mounted = true
-    setIsLoading(true)
     getTransactionsPage({ limit: pageSize, offset: page * pageSize, search: search.trim() || undefined, type, direction, accountId: accountFilter || undefined, categoryId: categoryFilter || undefined, personId: personFilter || undefined, dateFrom: dateRange.from, dateTo: dateRange.to, sortBy, sortOrder }).then((nextPage) => { if (mounted) setPageData(nextPage) }).catch((requestError) => { if (mounted) showError(requestError) }).finally(() => { if (mounted) setIsLoading(false) })
     return () => { mounted = false }
   }, [accountFilter, categoryFilter, dateRange.from, dateRange.to, direction, page, pageSize, personFilter, search, sortBy, sortOrder, type])

@@ -13,8 +13,8 @@ export function getMe() {
   return apiRequest<AuthUser>('/auth/me')
 }
 
-export function updateProfile(name: string) {
-  return apiRequest<AuthUser>('/auth/me', { method: 'PATCH', body: JSON.stringify({ name }) })
+export function updateProfile(name?: string, preferences?: { review_transactions?: boolean; timezone?: string }) {
+  return apiRequest<AuthUser>('/auth/me', { method: 'PATCH', body: JSON.stringify({ name, ...preferences }) })
 }
 
 export function logout() {

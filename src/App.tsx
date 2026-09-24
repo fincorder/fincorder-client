@@ -5,6 +5,8 @@ import { CapturePage } from './pages/CapturePage'
 import { ComingSoonPage } from './pages/ComingSoonPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { TransactionsPage } from './pages/TransactionsPage'
+import { ReviewPage } from './pages/ReviewPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { AuthProvider } from './context/AuthContext'
 import { ProtectedRoute, PublicOnlyRoute } from './components/auth/RouteGuards'
 
@@ -24,7 +26,9 @@ function App() {
             <Route path="/app/accounts" element={<ComingSoonPage />} />
             <Route path="/app/people" element={<ComingSoonPage />} />
             <Route path="/app/transactions" element={<TransactionsPage />} />
-            <Route path="/app/reports" element={<ComingSoonPage />} />
+            <Route path="/app/review" element={<ReviewPage />} />
+            <Route path="/app/reports" element={<Navigate to="/app/reports/overview" replace />} />
+            <Route path="/app/reports/:view" element={<ReportsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

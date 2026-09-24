@@ -8,8 +8,8 @@ export function ChatComposer({ disabled = false, onSend }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   function submit() {
-    const message = value.trim()
-    if (!message || disabled) return
+    if (!value.trim() || disabled) return
+    const message = value
     onSend(message)
     setValue('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'

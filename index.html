@@ -6,6 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f97316" />
     <title>Fincorder - Your money, in context</title>
+    <script>
+      (() => {
+        try {
+          const storedTheme = localStorage.getItem('fincorder_theme')
+          const theme = storedTheme === 'dark' || storedTheme === 'light'
+            ? storedTheme
+            : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          document.documentElement.classList.toggle('dark', theme === 'dark')
+          document.documentElement.style.colorScheme = theme
+        } catch {
+          // Theme initialization is repeated safely by the application entry point.
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

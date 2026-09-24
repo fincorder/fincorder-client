@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { CircleCheck, Menu, Sparkles } from 'lucide-react'
 import { AppShell } from '../components/layout/AppShell'
 import { ChatComposer } from '../components/capture/ChatComposer'
 import { ConversationSidebar } from '../components/capture/ConversationSidebar'
 import { MessageBubble } from '../components/capture/MessageBubble'
 import { ApiError } from '../services/api/client'
-import { captureTransaction, confirmCapture, getConversationFinancialEvents, getConversationMessages, rejectCapture } from '../services/api/capture'
+import { captureTransaction, confirmCapture, getConversationFinancialEvents, getConversationMessages, rejectCapture, saveCaptureDraft } from '../services/api/capture'
+import { useAuth } from '../context/AuthContext'
 import { archiveConversation, createConversation, getConversations, updateConversation } from '../services/api/conversations'
 import type { CaptureMessage, TransactionProposal } from '../types/capture'
 import type { Conversation } from '../types/conversations'
@@ -23,6 +25,11 @@ function getConversationTitle(message: string) {
 }
 
 export function CapturePage() {
+  const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const [resumeEventId, setResumeEventId] = useState<string>()
+  const [retryContent, setRetryContent] = useState<string>()
+  const requestRef = useRef<{ content: string; conversationId?: string; eventId?: string; id: string } | null>(null)
   const [messages, setMessages] = useState<CaptureMessage[]>([WELCOME_MESSAGE])
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [conversationId, setConversationId] = useState<string>()
@@ -42,10 +49,13 @@ export function CapturePage() {
       .then((nextConversations) => {
         if (!isMounted) return
         setConversations(nextConversations)
-        const storedId = localStorage.getItem(ACTIVE_CONVERSATION_KEY)
+        const requestedConversationId = searchParams.get('conversation')
+        const requestedEventId = searchParams.get('event')
+        const storedId = requestedConversationId ?? localStorage.getItem(ACTIVE_CONVERSATION_KEY)
         if (storedId && nextConversations.some((conversation) => conversation.id === storedId)) {
           setIsLoadingMessages(true)
           setConversationId(storedId)
+          if (requestedEventId) setResumeEventId(requestedEventId)
         } else {
           localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
         }
@@ -56,7 +66,7 @@ export function CapturePage() {
       .finally(() => { if (isMounted) setIsConversationsLoading(false) })
 
     return () => { isMounted = false }
-  }, [])
+  }, [searchParams])
 
   useEffect(() => {
     if (!conversationId) return
@@ -65,19 +75,16 @@ export function CapturePage() {
     Promise.all([getConversationMessages(conversationId), getConversationFinancialEvents(conversationId)])
       .then(([conversationMessages, financialEvents]) => {
         if (!isMounted) return
-        const pendingProposals = financialEvents
-          .filter((event) => event.status === 'needs_clarification' && (event.missing_fields?.length ?? 0) === 0 && event.extracted_data?.transactions?.length)
-          .map((event) => ({ id: event.id, transactions: event.extracted_data!.transactions! }))
-        let proposalIndex = 0
+        const eventsByMessage = new Map(financialEvents.filter((event) => event.assistant_message_id).map((event) => [event.assistant_message_id, event]))
         const restoredMessages = conversationMessages
           .filter((message) => message.role === 'user' || message.role === 'assistant')
           .map((message) => {
-            const proposalEvent = message.role === 'assistant' && message.content.includes('Review the transaction details') ? pendingProposals[proposalIndex++] : undefined
+            const proposalEvent = eventsByMessage.get(message.id)
             return {
               id: message.id,
               role: message.role as CaptureMessage['role'],
               content: message.content,
-              ...(proposalEvent ? { proposal: proposalEvent.transactions, financialEventId: proposalEvent.id } : {}),
+              ...(proposalEvent ? { proposal: proposalEvent.extracted_data?.transactions, financialEventId: proposalEvent.id, captureStatus: proposalEvent.status, revision: proposalEvent.revision } : {}),
             }
           })
         setMessages(restoredMessages.length > 0 ? restoredMessages : [WELCOME_MESSAGE])
@@ -105,6 +112,9 @@ export function CapturePage() {
   const statusLabel = isSending ? 'Fincorder is thinking' : isLoadingMessages ? 'Loading chat' : 'Ready to capture'
 
   function selectConversation(nextConversationId?: string) {
+    if (isSending || proposalSubmittingId) return
+    setResumeEventId(undefined)
+    setRetryContent(undefined)
     setError('')
     setIsSidebarOpen(false)
     if (nextConversationId === conversationId) return
@@ -116,6 +126,7 @@ export function CapturePage() {
   }
 
   async function handleCreateConversation() {
+    if (isSending || proposalSubmittingId) return
     setIsCreating(true)
     setError('')
     try {
@@ -159,8 +170,10 @@ export function CapturePage() {
     setProposalSubmittingId(eventId)
     setError('')
     try {
-      const response = await confirmCapture(eventId, transactions)
-      setMessages((current) => current.map((message) => message.financialEventId === eventId ? { ...message, content: response.assistant_message, proposal: undefined } : message))
+      const revision = messages.find((message) => message.financialEventId === eventId)?.revision ?? 1
+      const response = await confirmCapture(eventId, transactions, revision)
+      setMessages((current) => current.map((message) => message.financialEventId === eventId ? { ...message, content: response.assistant_message, proposal: transactions, captureStatus: response.status, revision: response.revision } : message))
+      if (resumeEventId === eventId) setResumeEventId(undefined)
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : 'Could not save this transaction.')
     } finally {
@@ -173,7 +186,8 @@ export function CapturePage() {
     setError('')
     try {
       const response = await rejectCapture(eventId)
-      setMessages((current) => current.map((message) => message.financialEventId === eventId ? { ...message, content: response.assistant_message, proposal: undefined } : message))
+      setMessages((current) => current.map((message) => message.financialEventId === eventId ? { ...message, content: response.assistant_message, captureStatus: response.status, revision: response.revision } : message))
+      if (resumeEventId === eventId) setResumeEventId(undefined)
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : 'Could not remove this proposal.')
     } finally {
@@ -182,23 +196,30 @@ export function CapturePage() {
   }
 
   async function handleSend(content: string) {
+    if (isSending) return
     const userMessage: CaptureMessage = { id: `user-${Date.now()}`, role: 'user', content }
     setMessages((current) => [...current, userMessage])
     setError('')
     setIsSending(true)
 
     try {
-      const response = await captureTransaction(content, conversationId)
+      const previous = requestRef.current
+      const request = previous && previous.content === content && previous.conversationId === conversationId && previous.eventId === resumeEventId ? previous : { content, conversationId, eventId: resumeEventId, id: crypto.randomUUID() }
+      requestRef.current = request
+      const response = await captureTransaction(content, conversationId, request.id, resumeEventId)
+      requestRef.current = null
+      setRetryContent(undefined)
+      setResumeEventId(undefined)
       const resolvedConversationId = response.conversation_id
       setConversationId(resolvedConversationId)
       localStorage.setItem(ACTIVE_CONVERSATION_KEY, resolvedConversationId)
       setMessages((current) => [
-        ...current.map((item) => item.financialEventId === response.financial_event_id ? { ...item, proposal: undefined } : item),
+        ...current.map((item) => item.financialEventId === response.financial_event_id ? { ...item, proposal: undefined, financialEventId: undefined, captureStatus: undefined } : item),
         {
           id: response.assistant_message_id ?? `assistant-${Date.now()}`,
           role: 'assistant',
           content: response.assistant_message,
-          ...(response.awaiting_confirmation ? { proposal: response.proposed_transactions, financialEventId: response.financial_event_id } : {}),
+          proposal: response.proposed_transactions, financialEventId: response.financial_event_id, captureStatus: response.status, revision: response.revision,
         },
       ])
 
@@ -209,12 +230,25 @@ export function CapturePage() {
       const latestConversations = await getConversations()
       setConversations(latestConversations)
     } catch (requestError) {
+      setRetryContent(content)
       const message = requestError instanceof ApiError ? requestError.message : 'I could not reach the Fincorder backend. Check that the API is running and try again.'
       setError(message)
       setMessages((current) => [...current, { id: `error-${Date.now()}`, role: 'assistant', content: 'I couldn\'t record that yet. Please check the connection and try again.' }])
     } finally {
       setIsSending(false)
     }
+  }
+
+  async function handleSaveDraft(eventId: string, transactions: TransactionProposal[]) {
+    setProposalSubmittingId(eventId)
+    setError('')
+    try {
+      const revision = messages.find((message) => message.financialEventId === eventId)?.revision ?? 1
+      const response = await saveCaptureDraft(eventId, transactions, revision)
+      setMessages((current) => current.map((message) => message.financialEventId === eventId ? { ...message, proposal: transactions, revision: response.revision } : message))
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not save draft.')
+    } finally { setProposalSubmittingId(undefined) }
   }
 
   return (
@@ -245,12 +279,12 @@ export function CapturePage() {
               </div>
               <div className="space-y-5">
               {isLoadingMessages && <div className="flex items-center justify-center py-10"><div className="size-7 animate-spin rounded-full border-2 border-orange-500/20 border-t-orange-500" /></div>}
-              {!isLoadingMessages && messages.map((message, index) => <MessageBubble key={message.id} message={message} isLatest={index === messages.length - 1} onConfirmProposal={(eventId, transactions) => void handleConfirmProposal(eventId, transactions)} onRejectProposal={(eventId) => void handleRejectProposal(eventId)} isProposalSubmitting={message.financialEventId === proposalSubmittingId} />)}
+              {!isLoadingMessages && messages.map((message, index) => <MessageBubble key={message.id} message={message} isLatest={index === messages.length - 1} onConfirmProposal={(eventId, transactions) => void handleConfirmProposal(eventId, transactions)} onRejectProposal={(eventId) => void handleRejectProposal(eventId)} isProposalSubmitting={message.financialEventId === proposalSubmittingId} onSaveDraft={(eventId, transactions) => void handleSaveDraft(eventId, transactions)} onResume={setResumeEventId} />)}
               {isSending && <div className="flex items-end gap-3 animate-message-in"><div className="grid size-8 place-items-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300"><Sparkles size={16} /></div><div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-slate-200 bg-white px-5 py-4 dark:border-slate-700 dark:bg-[#132238]"><span className="size-1.5 animate-pulse-soft rounded-full bg-orange-400" /><span className="size-1.5 animate-pulse-soft rounded-full bg-orange-400 [animation-delay:150ms]" /><span className="size-1.5 animate-pulse-soft rounded-full bg-orange-400 [animation-delay:300ms]" /></div></div>}
               </div>
             </div>
 
-            <div className="shrink-0 pt-4"><ChatComposer disabled={isSending || isLoadingMessages} onSend={handleSend} />{error && <p className="mt-2 flex items-center gap-1.5 px-2 text-xs font-semibold text-red-500"><CircleCheck size={13} className="rotate-45" /> {error}</p>}</div>
+            <div className="shrink-0 pt-4"><div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400"><span>{user?.review_transactions === false ? 'Automatic capture' : 'Review before saving'}</span>{resumeEventId && <button type="button" onClick={() => setResumeEventId(undefined)} className="font-bold text-orange-500">Replying to selected draft · Start something new</button>}</div>{retryContent && <button type="button" disabled={isSending} onClick={() => void handleSend(retryContent)} className="mb-2 text-xs font-bold text-orange-500">Retry last message</button>}<ChatComposer disabled={isSending || isLoadingMessages || Boolean(proposalSubmittingId)} onSend={handleSend} />{error && <p className="mt-2 flex items-center gap-1.5 px-2 text-xs font-semibold text-red-500"><CircleCheck size={13} className="rotate-45" /> {error}</p>}</div>
           </main>
         </div>
       </section>
