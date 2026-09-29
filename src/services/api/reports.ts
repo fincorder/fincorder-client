@@ -19,7 +19,7 @@ export function getReportOptions() {
   return apiRequest<ReportOptions>('/reports/options')
 }
 
-export async function exportReport(view: ReportName, filters: ReportFilters) {
+export async function exportReport(view: ReportName, filters: ReportFilters, filename = view) {
   const token = localStorage.getItem('fincorder_access_token')
   const response = await fetch(`${API_URL}/reports/export?view=${view}&${query(filters)}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -31,7 +31,7 @@ export async function exportReport(view: ReportName, filters: ReportFilters) {
   const url = URL.createObjectURL(await response.blob())
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `fincorder-${view}.csv`
+  anchor.download = `fincorder-${filename}.csv`
   document.body.append(anchor)
   anchor.click()
   anchor.remove()

@@ -10,9 +10,9 @@ function format(value: unknown, column: ReportColumn, currency: string, timezone
   return String(value)
 }
 
-export function ReportTable({ data, filters, onChange, timezone }: { data: ReportData; filters: ReportFilters; onChange: (patch: Partial<ReportFilters>) => void; timezone?: string }) {
+export function ReportTable({ data, filters, onChange, timezone, title: titleOverride }: { data: ReportData; filters: ReportFilters; onChange: (patch: Partial<ReportFilters>) => void; timezone?: string; title?: string }) {
   const visibleColumns: ReportColumn[] = data.report === 'pivot' ? [{ key: 'label', label: filters.pivot_row }, ...data.pivot_columns.map((column) => ({ key: column, label: column, money: filters.pivot_measure !== 'count' })), { key: 'total', label: 'Total', money: filters.pivot_measure !== 'count' }] : reportColumns[data.report]
-  const title = data.report === 'overview' ? 'Largest expenses' : data.report === 'pivot' ? 'Pivot table' : `${data.report[0].toUpperCase() + data.report.slice(1)} table`
+  const title = titleOverride ?? (data.report === 'overview' ? 'Largest expenses' : data.report === 'pivot' ? 'Pivot table' : `${data.report[0].toUpperCase() + data.report.slice(1)} table`)
   const sortOptions = data.report === 'people' ? [['owed_to_you', 'Owed to you'], ['you_owe', 'You owe'], ['net_position', 'Net'], ['spending', 'Spending'], ['label', 'Name']] : data.report === 'pivot' ? [['total', 'Total'], ['label', 'Name']] : ['spending', 'income', 'activity', 'transfers', 'quality'].includes(data.report) ? [['transaction_date', 'Date'], ['amount', 'Amount']] : [['amount', 'Amount'], ['count', 'Count'], ['label', 'Name']]
   function cell(row: Record<string, unknown>, column: ReportColumn) {
     const value = data.report === 'pivot' && column.key !== 'label' && column.key !== 'total' ? (row.cells as Record<string, unknown>)?.[column.key] : row[column.key]
