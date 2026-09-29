@@ -2,14 +2,14 @@ import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { BarChart3, CheckCheck, List, MessageCircle, UserRound } from 'lucide-react'
 import { BrandMark } from '../brand/BrandMark'
-import { AVATAR_KEY, useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/AuthContext'
 
 interface AppShellProps { children: ReactNode }
 
 export function AppShell({ children }: AppShellProps) {
   const { user } = useAuth()
   const initials = user?.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() ?? 'FC'
-  const avatar = localStorage.getItem(AVATAR_KEY)
+  const avatar = user?.avatar_url
 
   return (
     <main className="min-h-screen w-full bg-[#fffdfa] text-slate-900 dark:bg-[#08111f] dark:text-white">

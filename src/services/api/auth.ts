@@ -17,6 +17,16 @@ export function updateProfile(name?: string, preferences?: { review_transactions
   return apiRequest<AuthUser>('/auth/me', { method: 'PATCH', body: JSON.stringify({ name, ...preferences }) })
 }
 
+export function uploadAvatar(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return apiRequest<AuthUser>('/auth/me/avatar', { method: 'POST', body: form })
+}
+
+export function removeAvatar() {
+  return apiRequest<AuthUser>('/auth/me/avatar', { method: 'DELETE' })
+}
+
 export function logout() {
   return apiRequest<{ message: string }>('/auth/logout', { method: 'POST' })
 }

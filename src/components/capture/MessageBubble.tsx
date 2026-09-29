@@ -1,5 +1,5 @@
 import { Bot, UserRound } from 'lucide-react'
-import { AVATAR_KEY } from '../../context/AuthContext'
+import { useAuth } from '../../context/AuthContext'
 import type { CaptureMessage, TransactionProposal } from '../../types/capture'
 import { TransactionProposalCard } from './TransactionProposalCard'
 
@@ -15,7 +15,8 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, isLatest = false, onConfirmProposal, onRejectProposal, onSaveDraft, onResume, isProposalSubmitting = false }: MessageBubbleProps) {
   const isUser = message.role === 'user'
-  const avatar = isUser ? localStorage.getItem(AVATAR_KEY) : null
+  const { user } = useAuth()
+  const avatar = isUser ? user?.avatar_url : null
   return (
     <div className={['flex w-full items-end gap-3', isUser ? 'justify-end' : 'justify-start', isLatest ? 'animate-message-in' : ''].join(' ')}>
       {!isUser && <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300"><Bot size={16} /></div>}

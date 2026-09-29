@@ -22,7 +22,8 @@ async function getErrorMessage(response: Response) {
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('fincorder_access_token')
   const headers = new Headers(options.headers)
-  headers.set('Content-Type', 'application/json')
+  if (options.body instanceof FormData) headers.delete('Content-Type')
+  else headers.set('Content-Type', 'application/json')
   if (token) headers.set('Authorization', 'Bearer ' + token)
 
   const response = await fetch(API_URL + path, { ...options, headers })

@@ -1,10 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { getMe, login as loginRequest, logout as logoutRequest, updateProfile } from '../services/api/auth'
+import { getMe, login as loginRequest, logout as logoutRequest, removeAvatar as removeAvatarRequest, updateProfile, uploadAvatar } from '../services/api/auth'
 import type { AuthSession, AuthUser, LoginPayload } from '../types/auth'
 
 export const ACCESS_TOKEN_KEY = 'fincorder_access_token'
 export const USER_KEY = 'fincorder_user'
-export const AVATAR_KEY = 'fincorder_avatar'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -12,6 +11,8 @@ interface AuthContextValue {
   signIn: (payload: LoginPayload) => Promise<void>
   signInWithSession: (session: AuthSession, email?: string) => void
   saveProfile: (name: string) => Promise<void>
+  saveAvatar: (file: File) => Promise<void>
+  removeAvatar: () => Promise<void>
   savePreferences: (preferences: { review_transactions?: boolean; timezone?: string }) => Promise<void>
   signOut: () => Promise<void>
 }
@@ -73,12 +74,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(nextUser)
   }
 
+  async function saveAvatar(file: File) {
+    const updated = await uploadAvatar(file)
+    const nextUser = { ...user, ...updated, email: updated.email ?? user?.email } as AuthUser
+    localStorage.removeItem('fincorder_avatar')
+    persistUser(nextUser)
+    setUser(nextUser)
+  }
+
+  async function removeAvatar() {
+    const updated = await removeAvatarRequest()
+    const nextUser = { ...user, ...updated, email: updated.email ?? user?.email } as AuthUser
+    localStorage.removeItem('fincorder_avatar')
+    persistUser(nextUser)
+    setUser(nextUser)
+  }
+
   async function signOut() {
     try {
       if (localStorage.getItem(ACCESS_TOKEN_KEY)) await logoutRequest()
     } finally {
       localStorage.removeItem(ACCESS_TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
+      localStorage.removeItem('fincorder_avatar')
       localStorage.removeItem('fincorder_active_conversation')
       setUser(null)
     }
@@ -90,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updated)
   }
 
-  const value = { user, isLoading, signIn, signInWithSession: setSession, saveProfile, savePreferences, signOut }
+  const value = { user, isLoading, signIn, signInWithSession: setSession, saveProfile, saveAvatar, removeAvatar, savePreferences, signOut }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

@@ -5,6 +5,7 @@ export interface AuthUser {
   email?: string
   review_transactions?: boolean
   timezone?: string
+  avatar_url?: string | null
 }
 
 export interface AuthSession extends AuthUser {
